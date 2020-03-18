@@ -45,12 +45,12 @@ void DumpAll(std::string name) {
     FILE* fp = fopen((PATH + name + EXT).data(), "w");
     log(DEBUG, "Logging to path: %s", (PATH + name + EXT).data());
 
-    Il2CppArray* arr;
+    Array<Il2CppObject *>* arr;
     static auto typeObject = il2cpp_utils::GetSystemType("UnityEngine", "GameObject");
     RUN_METHOD1(&arr, il2cpp_utils::GetClassFromName("UnityEngine", "Resources"), "FindObjectsOfTypeAll", typeObject);
     Il2CppObject* transform;
-    for (il2cpp_array_size_t i = 0; i < arr->bounds->length; i++) {
-        auto go = il2cpp_array_get(arr, Il2CppObject*, 0);
+    for (il2cpp_array_size_t i = 0; i < arr->Length(); i++) {
+        auto go = arr->values[i];
         if (go != nullptr) {
             RUN_METHOD0(&transform, go, "get_transform");
             if (transform != nullptr) {
@@ -71,12 +71,14 @@ void DumpAll(std::string name) {
     fclose(fp);
 }
 
-MAKE_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, void, Il2CppObject* scene, int mode) {
+MAKE_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, void, Scene scene, int mode) {
     SceneManager_Internal_SceneLoaded(scene, mode);
     // Get name of scene
     Il2CppString* name;
-    RUN_METHOD0(&name, scene, "get_name");
-    DumpAll(to_utf8(csstrtostr(name)));
+    RUN_METHOD0(&name, &scene, il2cpp_utils::FindMethod("UnityEngine.SceneManagement", "Scene", "get_name", 0));
+    if (name) {
+        DumpAll(to_utf8(csstrtostr(name)));
+    }
 }
 
 extern "C" void load() {
