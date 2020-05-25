@@ -1,22 +1,30 @@
-#include "../include/main.hpp"
+#include <dlfcn.h>
+#include "../extern/beatsaber-hook/shared/utils/utils.h"
+#include "../extern/beatsaber-hook/shared/utils/logging.hpp"
+#include "../extern/beatsaber-hook/include/modloader.hpp"
+#include "../extern/beatsaber-hook/shared/utils/typedefs.h"
+#include "../extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
+#include "../extern/beatsaber-hook/shared/utils/il2cpp-functions.hpp"
 
 #define PATH "/sdcard/Android/data/com.beatgames.beatsaber/files/logdump-"
 #define EXT ".txt"
 
+static const Logger* logger;
+
 void write_info(FILE* fp, std::string str) {
-    log(DEBUG, "%s", str.data());
+    logger->log_debug("%s", str.data());
     fwrite((str + "\n").data(), str.length() + 1, 1, fp);
 }
 
 void DumpParents(FILE* fp, std::string prefix, Il2CppObject* parentTransform) {
     // Get children
-    int childCount = *CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(parentTransform, "childCount"));
-    Il2CppString* parentName = *CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(parentTransform, "name"));
+    int childCount = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<int>(parentTransform, "childCount"));
+    Il2CppString* parentName = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(parentTransform, "name"));
     write_info(fp, prefix + (parentName != nullptr ? to_utf8(csstrtostr(parentName)) : "<NULL NAME>") + " Children: " + std::to_string(childCount));
     Il2CppObject* child;
 
     for (int i = 0; i < childCount; i++) {
-        child = *CRASH_UNLESS(il2cpp_utils::RunMethod<Il2CppObject*>(parentTransform, "GetChild", i));
+        child = CRASH_UNLESS(il2cpp_utils::RunMethod<Il2CppObject*>(parentTransform, "GetChild", i));
         if (child) {
             DumpParents(fp, prefix + "-", child);
         }
@@ -27,20 +35,20 @@ void DumpParents(FILE* fp, std::string prefix, Il2CppObject* parentTransform) {
 void DumpAll(std::string name) {
     FILE* fp = fopen((PATH + name + EXT).data(), "w");
     static auto typeObject = il2cpp_utils::GetSystemType("UnityEngine", "GameObject");
-    log(DEBUG, "Logging to path: %s", (PATH + name + EXT).data());
+    logger->log_debug("Logging to path: %s", (PATH + name + EXT).data());
 
-    log(DEBUG, "Getting all GameObjects!");
-    Array<Il2CppObject*>* arr = *CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>("UnityEngine", "Resources", "FindObjectsOfTypeAll", typeObject));
+    logger->log_debug("Getting all GameObjects!");
+    Array<Il2CppObject*>* arr = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>("UnityEngine", "Resources", "FindObjectsOfTypeAll", typeObject));
     Il2CppObject* transform;
     Il2CppObject* parentTransform;
     Il2CppString* goName;
     for (il2cpp_array_size_t i = 0; i < arr->Length(); i++) {
         auto go = arr->values[i];
         if (go) {
-            transform = *CRASH_UNLESS(il2cpp_utils::GetPropertyValue(go, "transform"));
-            goName = *CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(go, "name"));
+            transform = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(go, "transform"));
+            goName = CRASH_UNLESS(il2cpp_utils::GetPropertyValue<Il2CppString*>(go, "name"));
             if (transform) {
-                parentTransform = *CRASH_UNLESS(il2cpp_utils::GetPropertyValue(transform, "parent"));
+                parentTransform = CRASH_UNLESS(il2cpp_utils::GetPropertyValue(transform, "parent"));
                 if (parentTransform == nullptr) {
                     // Has no parent!
                     write_info(fp, "GameObject: " + (goName != nullptr ? to_utf8(csstrtostr(goName)) : "<NULL GAMEOBJECT NAME>"));
@@ -60,17 +68,31 @@ void DumpAll(std::string name) {
 MAKE_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, void, Scene scene, int mode) {
     SceneManager_Internal_SceneLoaded(scene, mode);
     // Get name of scene
-    Il2CppString* name = *CRASH_UNLESS(il2cpp_utils::RunMethod<Il2CppString*>(&scene, il2cpp_utils::FindMethod("UnityEngine.SceneManagement", "Scene", "get_name")));
+    Il2CppString* name = CRASH_UNLESS(il2cpp_utils::RunMethod<Il2CppString*>(&scene, il2cpp_utils::FindMethod("UnityEngine.SceneManagement", "Scene", "get_name")));
     if (name) {
-        log(DEBUG, "DUMPING SCENE: %s", to_utf8(csstrtostr(name)).data());
+        logger->log_debug("DUMPING SCENE: %s", to_utf8(csstrtostr(name)).data());
         DumpAll(to_utf8(csstrtostr(name)));
     } else {
-        log(DEBUG, "NAME NULL FOR SCENE WITH HANDLE: %d", scene.m_Handle);
+        logger->log_debug("NAME NULL FOR SCENE WITH HANDLE: %d", scene.m_Handle);
     }
 }
 
+// This function is called before a mod is constructed for the first time.
+// Perform one time setup, as well as specify the mod ID and version here.
+extern "C" void setup(ModInfo& info) {
+    info.id = "UnityDumperQuest";
+    info.version = "0.1.0";
+    // Create logger
+    static std::unique_ptr<const Logger> ptr(new Logger(info));
+    logger = ptr.get();
+    logger->log_info("Completed setup!");
+    // We can even check information specific to the modloader!
+    logger->log_info("Modloader name: %s", Modloader::getInfo().name.c_str());
+}
+
+// This function is called when the mod is loaded for the first time, immediately after il2cpp_init.
 extern "C" void load() {
-    log(DEBUG, "Installing Unity Dumper!");
+    logger->log_debug("Installing Unity Dumper!");
     INSTALL_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, il2cpp_utils::FindMethodUnsafe("UnityEngine.SceneManagement", "SceneManager", "Internal_SceneLoaded", 2));
-    log(DEBUG, "Installed Unity Dumper!");
+    logger->log_debug("Installed Unity Dumper!");
 }
