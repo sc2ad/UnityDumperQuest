@@ -5,11 +5,13 @@
 #include "../extern/beatsaber-hook/shared/utils/typedefs.h"
 #include "../extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
 #include "../extern/beatsaber-hook/shared/utils/il2cpp-functions.hpp"
+#include "../extern/beatsaber-hook/shared/config/config-utils.hpp"
 
 #define PATH "/sdcard/Android/data/com.beatgames.beatsaber/files/logdump-"
 #define EXT ".txt"
 
 static const Logger* logger;
+static Configuration* config;
 
 void write_info(FILE* fp, std::string str) {
     logger->log_debug("%s", str.data());
@@ -88,6 +90,12 @@ extern "C" void setup(ModInfo& info) {
     logger->log_info("Completed setup!");
     // We can even check information specific to the modloader!
     logger->log_info("Modloader name: %s", Modloader::getInfo().name.c_str());
+    // Create config
+    static std::unique_ptr<Configuration> ptr2(new Configuration(info));
+    config = ptr2.get();
+    config->Load();
+    // Can use config->config to modify the rapidjson document
+    config->Write();
 }
 
 // This function is called when the mod is loaded for the first time, immediately after il2cpp_init.
