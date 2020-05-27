@@ -41,7 +41,7 @@ include $(CLEAR_VARS)
 LOCAL_SHARED_LIBRARIES := modloader
 LOCAL_SHARED_LIBRARIES += beatsaber-hook_2019_2_1f1_0_1_1
 LOCAL_LDLIBS     := -llog
-LOCAL_CFLAGS     := -D"MOD_ID=\"dumper\"" -D"VERSION=\"0.1.0\"" -I"c:/Program Files/Unity/Editor/Data/il2cpp/libil2cpp"
+LOCAL_CFLAGS     := -I"c:/Program Files/Unity/Editor/Data/il2cpp/libil2cpp"
 LOCAL_MODULE     := dumper
 LOCAL_CPPFLAGS   := -std=c++2a
 LOCAL_C_INCLUDES := ./include ./src
