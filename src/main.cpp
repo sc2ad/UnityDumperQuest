@@ -10,11 +10,20 @@
 #define PATH "/sdcard/Android/data/com.beatgames.beatsaber/files/logdump-"
 #define EXT ".txt"
 
-static const Logger* logger;
-static Configuration* config;
+static ModInfo modInfo;
+
+static Configuration& getConfig() {
+    static Configuration config(modInfo);
+    return config;
+}
+
+static const Logger& getLogger() {
+    static const Logger logger(modInfo);
+    return logger;
+}
 
 void write_info(FILE* fp, std::string str) {
-    logger->log_debug("%s", str.data());
+    getLogger().debug("%s", str.data());
     fwrite((str + "\n").data(), str.length() + 1, 1, fp);
 }
 
@@ -37,9 +46,9 @@ void DumpParents(FILE* fp, std::string prefix, Il2CppObject* parentTransform) {
 void DumpAll(std::string name) {
     FILE* fp = fopen((PATH + name + EXT).data(), "w");
     static auto typeObject = il2cpp_utils::GetSystemType("UnityEngine", "GameObject");
-    logger->log_debug("Logging to path: %s", (PATH + name + EXT).data());
+    getLogger().debug("Logging to path: %s", (PATH + name + EXT).data());
 
-    logger->log_debug("Getting all GameObjects!");
+    getLogger().debug("Getting all GameObjects!");
     Array<Il2CppObject*>* arr = CRASH_UNLESS(il2cpp_utils::RunMethod<Array<Il2CppObject*>*>("UnityEngine", "Resources", "FindObjectsOfTypeAll", typeObject));
     Il2CppObject* transform;
     Il2CppObject* parentTransform;
@@ -72,35 +81,33 @@ MAKE_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, void, Scene scene, int m
     // Get name of scene
     Il2CppString* name = CRASH_UNLESS(il2cpp_utils::RunMethod<Il2CppString*>(&scene, il2cpp_utils::FindMethod("UnityEngine.SceneManagement", "Scene", "get_name")));
     if (name) {
-        logger->log_debug("DUMPING SCENE: %s", to_utf8(csstrtostr(name)).data());
+        getLogger().debug("DUMPING SCENE: %s", to_utf8(csstrtostr(name)).data());
         DumpAll(to_utf8(csstrtostr(name)));
     } else {
-        logger->log_debug("NAME NULL FOR SCENE WITH HANDLE: %d", scene.m_Handle);
+        getLogger().debug("NAME NULL FOR SCENE WITH HANDLE: %d", scene.m_Handle);
     }
 }
 
 // This function is called before a mod is constructed for the first time.
 // Perform one time setup, as well as specify the mod ID and version here.
 extern "C" void setup(ModInfo& info) {
+    // This should be the first thing done
+    modInfo = info;
     info.id = "UnityDumperQuest";
     info.version = "0.1.0";
-    // Create logger
-    static std::unique_ptr<const Logger> ptr(new Logger(info));
-    logger = ptr.get();
-    logger->log_info("Completed setup!");
+    getLogger().info("Completed setup!");
     // We can even check information specific to the modloader!
-    logger->log_info("Modloader name: %s", Modloader::getInfo().name.c_str());
-    // Create config
-    static std::unique_ptr<Configuration> ptr2(new Configuration(info));
-    config = ptr2.get();
-    config->Load();
-    // Can use config->config to modify the rapidjson document
-    config->Write();
+    getLogger().info("Modloader name: %s", Modloader::getInfo().name.c_str());
+    // Load config
+    getConfig().Load();
+    // Can use getConfig().config to modify the rapidjson document
+    getConfig().Write();
 }
 
 // This function is called when the mod is loaded for the first time, immediately after il2cpp_init.
 extern "C" void load() {
-    logger->log_debug("Installing Unity Dumper!");
+    getLogger().debug("Installing Unity Dumper!");
     INSTALL_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, il2cpp_utils::FindMethodUnsafe("UnityEngine.SceneManagement", "SceneManager", "Internal_SceneLoaded", 2));
-    logger->log_debug("Installed Unity Dumper!");
+    getLogger().debug("Installed Unity Dumper!");
+    getLogger().info("initialized: %s", il2cpp_functions::initialized ? "true" : "false");
 }
