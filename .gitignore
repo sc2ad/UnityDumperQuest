@@ -43,3 +43,6 @@ out/
 [Oo]bjs/
 ndkpath.txt
 *.zip
+
+# QPM stuff
+extern/
