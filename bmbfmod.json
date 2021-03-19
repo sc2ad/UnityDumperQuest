@@ -1,25 +1,29 @@
 {
-    "id": "dumper",
-    "name": "Dumper",
-    "author": "Sc2ad",
-    "description": [
-        
-        "Dumps GameObject hierarchies to a file"
-        
-    ],
-    "category": "Gameplay",
-    "gameVersion": "1.7.0",
-    "version": "0.1.0",
-    "platform": "Quest",
-    "components": [
-        {
-            "type": "HookMod",
-            "installAction": {
-                "installLibraryFile": "libdumper.so"
-            },
-            "uninstallAction": {
-                "removeLibraryFile": "libdumper.so"
-            }
-        }
-    ]
+  "id": "UnityDumperQuest",
+  "name": "Dumper",
+  "version": "1.0.0",
+  "author": "Sc2ad",
+  "description": [
+    "Dumps GameObject hierarchies to a file"
+  ],
+  "category": "Gameplay",
+  "gameVersion": "1.7.0",
+  "platform": "Quest",
+  "components": [
+    {
+      "type": "HookMod",
+      "installAction": {
+        "installLibraryFile": "libdumper.so"
+      },
+      "uninstallAction": {
+        "removeLibraryFile": "libdumper.so"
+      }
+    },
+    {
+      "type": "HookModLibrary",
+      "installAction": {
+        "installLibraryFile": "libbeatsaber-hook_1_2_3.so"
+      }
+    }
+  ]
 }

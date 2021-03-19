@@ -1,14 +1,17 @@
 #include <dlfcn.h>
-#include "../extern/beatsaber-hook/shared/utils/utils.h"
-#include "../extern/beatsaber-hook/shared/utils/logging.hpp"
-#include "../extern/beatsaber-hook/include/modloader.hpp"
-#include "../extern/beatsaber-hook/shared/utils/typedefs.h"
-#include "../extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
-#include "../extern/beatsaber-hook/shared/utils/il2cpp-functions.hpp"
-#include "../extern/beatsaber-hook/shared/config/config-utils.hpp"
+#include "extern/beatsaber-hook/shared/utils/utils.h"
+#include "extern/beatsaber-hook/shared/utils/logging.hpp"
+#include "extern/beatsaber-hook/shared/utils/typedefs.h"
+#include "extern/beatsaber-hook/shared/utils/il2cpp-utils.hpp"
+#include "extern/beatsaber-hook/shared/utils/il2cpp-functions.hpp"
+#include "extern/beatsaber-hook/shared/config/config-utils.hpp"
+#include "modloader/shared/modloader.hpp"
 
-#define PATH "/sdcard/Android/data/com.beatgames.beatsaber/files/logdump-"
 #define EXT ".txt"
+
+typedef struct Scene {
+    int m_Handle;
+} Scene;
 
 static ModInfo modInfo;
 
@@ -17,9 +20,9 @@ static Configuration& getConfig() {
     return config;
 }
 
-static const Logger& getLogger() {
-    static const Logger logger(modInfo);
-    return logger;
+static Logger& getLogger() {
+    static Logger* logger = new Logger(modInfo);
+    return *logger;
 }
 
 void write_info(FILE* fp, std::string str) {
@@ -44,8 +47,14 @@ void DumpParents(FILE* fp, std::string prefix, Il2CppObject* parentTransform) {
 
 // Iterates over all GameObjects in the scene, dumps information about them to file
 void DumpAll(std::string name) {
+    std::string PATH = string_format(PERSISTENT_DIR, Modloader::getApplicationId().c_str()) + "Dumps/";
+    if(!direxists(PATH)) {
+        mkpath(PATH);
+    }
+
     FILE* fp = fopen((PATH + name + EXT).data(), "w");
-    static auto typeObject = il2cpp_utils::GetSystemType("UnityEngine", "GameObject");
+    static auto typeObject = il2cpp_utils::GetSystemType("UnityEngine", "GameObject");    
+
     getLogger().debug("Logging to path: %s", (PATH + name + EXT).data());
 
     getLogger().debug("Getting all GameObjects!");
@@ -79,10 +88,12 @@ void DumpAll(std::string name) {
 MAKE_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, void, Scene scene, int mode) {
     SceneManager_Internal_SceneLoaded(scene, mode);
     // Get name of scene
-    Il2CppString* name = CRASH_UNLESS(il2cpp_utils::RunMethod<Il2CppString*>(&scene, il2cpp_utils::FindMethod("UnityEngine.SceneManagement", "Scene", "get_name")));
-    if (name) {
-        getLogger().debug("DUMPING SCENE: %s", to_utf8(csstrtostr(name)).data());
-        DumpAll(to_utf8(csstrtostr(name)));
+    Il2CppString* cSharpName = CRASH_UNLESS(il2cpp_utils::RunMethod<Il2CppString*>(&scene, il2cpp_utils::FindMethod("UnityEngine.SceneManagement", "Scene", "get_name")));
+    if (cSharpName) {
+        std::string name = to_utf8(csstrtostr(cSharpName));
+
+        getLogger().debug("DUMPING SCENE: %s", name.c_str());
+        DumpAll(name);
     } else {
         getLogger().debug("NAME NULL FOR SCENE WITH HANDLE: %d", scene.m_Handle);
     }
@@ -107,7 +118,7 @@ extern "C" void setup(ModInfo& info) {
 // This function is called when the mod is loaded for the first time, immediately after il2cpp_init.
 extern "C" void load() {
     getLogger().debug("Installing Unity Dumper!");
-    INSTALL_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, il2cpp_utils::FindMethodUnsafe("UnityEngine.SceneManagement", "SceneManager", "Internal_SceneLoaded", 2));
+    INSTALL_HOOK_OFFSETLESS(getLogger(), SceneManager_Internal_SceneLoaded, il2cpp_utils::FindMethodUnsafe("UnityEngine.SceneManagement", "SceneManager", "Internal_SceneLoaded", 2));
     getLogger().debug("Installed Unity Dumper!");
     getLogger().info("initialized: %s", il2cpp_functions::initialized ? "true" : "false");
 }
