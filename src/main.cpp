@@ -10,6 +10,10 @@
 #define PATH "/sdcard/Android/data/com.beatgames.beatsaber/files/logdump-"
 #define EXT ".txt"
 
+typedef struct Scene {
+    int m_Handle;
+} Scene;
+
 static ModInfo modInfo;
 
 static Configuration& getConfig() {
