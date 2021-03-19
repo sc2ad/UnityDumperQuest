@@ -47,3 +47,6 @@ ndkpath.txt
 # QPM stuff
 extern/
 qpm.shared.json
+
+# QuestPatcher files
+*.qmod
