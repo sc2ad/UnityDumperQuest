@@ -7,7 +7,6 @@
 #include "extern/beatsaber-hook/shared/config/config-utils.hpp"
 #include "modloader/shared/modloader.hpp"
 
-#define PATH "/sdcard/Android/data/com.beatgames.beatsaber/files/logdump-"
 #define EXT ".txt"
 
 typedef struct Scene {
@@ -48,8 +47,14 @@ void DumpParents(FILE* fp, std::string prefix, Il2CppObject* parentTransform) {
 
 // Iterates over all GameObjects in the scene, dumps information about them to file
 void DumpAll(std::string name) {
+    std::string PATH = string_format(PERSISTENT_DIR, Modloader::getApplicationId().c_str()) + "Dumps/";
+    if(!direxists(PATH)) {
+        mkpath(PATH);
+    }
+
     FILE* fp = fopen((PATH + name + EXT).data(), "w");
-    static auto typeObject = il2cpp_utils::GetSystemType("UnityEngine", "GameObject");
+    static auto typeObject = il2cpp_utils::GetSystemType("UnityEngine", "GameObject");    
+
     getLogger().debug("Logging to path: %s", (PATH + name + EXT).data());
 
     getLogger().debug("Getting all GameObjects!");
@@ -83,10 +88,12 @@ void DumpAll(std::string name) {
 MAKE_HOOK_OFFSETLESS(SceneManager_Internal_SceneLoaded, void, Scene scene, int mode) {
     SceneManager_Internal_SceneLoaded(scene, mode);
     // Get name of scene
-    Il2CppString* name = CRASH_UNLESS(il2cpp_utils::RunMethod<Il2CppString*>(&scene, il2cpp_utils::FindMethod("UnityEngine.SceneManagement", "Scene", "get_name")));
-    if (name) {
-        getLogger().debug("DUMPING SCENE: %s", to_utf8(csstrtostr(name)).data());
-        DumpAll(to_utf8(csstrtostr(name)));
+    Il2CppString* cSharpName = CRASH_UNLESS(il2cpp_utils::RunMethod<Il2CppString*>(&scene, il2cpp_utils::FindMethod("UnityEngine.SceneManagement", "Scene", "get_name")));
+    if (cSharpName) {
+        std::string name = to_utf8(csstrtostr(cSharpName));
+
+        getLogger().debug("DUMPING SCENE: %s", name.c_str());
+        DumpAll(name);
     } else {
         getLogger().debug("NAME NULL FOR SCENE WITH HANDLE: %d", scene.m_Handle);
     }
